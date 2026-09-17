@@ -10,7 +10,14 @@ final class MenuBarController: NSObject {
         super.init()
 
         if let button = statusItem.button {
-            button.image = Self.menuIcon()
+            // Prefer a system symbol so the item is obvious in the menu bar;
+            // fall back to our drawn glyph on older macOS.
+            if let symbol = NSImage(systemSymbolName: "hand.tap", accessibilityDescription: "Triclick") {
+                symbol.isTemplate = true
+                button.image = symbol
+            } else {
+                button.image = Self.menuIcon()
+            }
             button.imagePosition = .imageOnly
             button.toolTip = "Triclick"
         }

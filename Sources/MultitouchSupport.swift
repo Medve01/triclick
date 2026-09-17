@@ -33,9 +33,3 @@ func MTRegisterContactFrameCallback(_ device: MTDeviceRef, _ callback: MTContact
 
 @_silgen_name("MTUnregisterContactFrameCallback")
 func MTUnregisterContactFrameCallback(_ device: MTDeviceRef, _ callback: MTContactCallbackFunction?)
-
-@_silgen_name("MTDeviceGetFamilyID")
-func MTDeviceGetFamilyID(_ device: MTDeviceRef) -> Int32
-
-@_silgen_name("MTDeviceIsBuiltIn")
-func MTDeviceIsBuiltIn(_ device: MTDeviceRef) -> Bool

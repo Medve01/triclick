@@ -7,9 +7,7 @@ final class DeviceMonitor {
 
     private var devices: [MTDeviceRef] = []
     private var started = false
-
-    /// Magic Mouse family IDs — we skip these (trackpad-only).
-    private static let magicMouseFamilies: Set<Int32> = [98, 112]
+    private var wakeObserver: NSObjectProtocol?
 
     private init() {}
 
@@ -18,8 +16,7 @@ final class DeviceMonitor {
         started = true
         registerDevices()
 
-        let center = NSWorkspace.shared.notificationCenter
-        center.addObserver(
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil,
             queue: .main
@@ -29,6 +26,10 @@ final class DeviceMonitor {
     }
 
     func stop() {
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+            self.wakeObserver = nil
+        }
         for device in devices {
             MTUnregisterContactFrameCallback(device, contactCallback)
             if MTDeviceIsRunning(device) {
@@ -45,23 +46,12 @@ final class DeviceMonitor {
     }
 
     private func registerDevices() {
+        // Prefer the default (built-in) trackpad. Iterating MTDeviceCreateList and
+        // calling family APIs on raw CFArray pointers is crash-prone across OS versions.
         var found: [MTDeviceRef] = []
 
-        if let listRef = MTDeviceCreateList()?.takeRetainedValue() {
-            let count = CFArrayGetCount(listRef)
-            for i in 0..<count {
-                guard let raw = CFArrayGetValueAtIndex(listRef, i) else { continue }
-                let device = MTDeviceRef(mutating: raw)
-                let family = MTDeviceGetFamilyID(device)
-                if Self.magicMouseFamilies.contains(family) {
-                    continue
-                }
-                found.append(device)
-            }
-        }
-
-        if found.isEmpty, let fallback = MTDeviceCreateDefault() {
-            found.append(fallback)
+        if let device = MTDeviceCreateDefault() {
+            found.append(device)
         }
 
         for device in found {
@@ -71,9 +61,9 @@ final class DeviceMonitor {
         devices = found
 
         if found.isEmpty {
-            NSLog("Triclick: no trackpad multitouch devices found")
+            NSLog("Triclick: no trackpad multitouch device found")
         } else {
-            NSLog("Triclick: listening on \(found.count) trackpad device(s)")
+            NSLog("Triclick: listening on built-in trackpad")
         }
     }
 }
