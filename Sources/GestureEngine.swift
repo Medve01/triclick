@@ -63,12 +63,21 @@ final class GestureEngine {
                 let dy = centroid.y - startCentroid.y
                 maxTravel = max(maxTravel, sqrt(dx * dx + dy * dy))
             }
-        } else if count == 0, gestureActive {
-            finishTapGestureLocked()
-            resetLocked()
-        } else if count > 0, count < 3, gestureActive {
-            // Fingers peeled off without a clean lift — cancel.
-            resetLocked()
+            return
+        }
+
+        // Fingers lift one-by-one (3→2→1→0). Keep the gesture alive until the
+        // pad is clear — cancelling on the way down ate every three-finger tap.
+        if gestureActive {
+            if count > 0, !contacts.isEmpty {
+                let dx = centroid.x - startCentroid.x
+                let dy = centroid.y - startCentroid.y
+                maxTravel = max(maxTravel, sqrt(dx * dx + dy * dy))
+            }
+            if count == 0 {
+                finishTapGestureLocked()
+                resetLocked()
+            }
         }
     }
 
@@ -79,9 +88,16 @@ final class GestureEngine {
         guard shouldEmitInFrontmostApp() else { return }
 
         let elapsedMs = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
-        guard elapsedMs <= Double(Preferences.maxTapTimeMs) else { return }
-        guard maxTravel <= Preferences.maxTapDistance else { return }
+        guard elapsedMs <= Double(Preferences.maxTapTimeMs) else {
+            NSLog("Triclick: tap ignored — too slow (%.0f ms)", elapsedMs)
+            return
+        }
+        guard maxTravel <= Preferences.maxTapDistance else {
+            NSLog("Triclick: tap ignored — moved too far (%.3f)", maxTravel)
+            return
+        }
 
+        NSLog("Triclick: three-finger tap → middle click")
         DispatchQueue.main.async {
             MiddleClickSynthesizer.postClick()
         }
@@ -92,7 +108,6 @@ final class GestureEngine {
         maxFingers = 0
         maxTravel = 0
         emittedFromClick = false
-        contactCount = 0
     }
 
     // MARK: - Physical three-finger click (convert left-click)

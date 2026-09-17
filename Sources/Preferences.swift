@@ -62,7 +62,7 @@ enum Preferences {
     static var maxTapTimeMs: Int {
         get {
             let value = defaults.object(forKey: Key.maxTapTimeMs) as? Int
-            return value ?? 300
+            return value ?? 500
         }
         set { defaults.set(newValue, forKey: Key.maxTapTimeMs) }
     }
