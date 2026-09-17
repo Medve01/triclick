@@ -26,4 +26,20 @@ enum AccessibilityHelper {
             }
         }
     }
+
+    /// Quit and relaunch so TCC picks up a newly granted Accessibility toggle.
+    /// macOS often leaves `AXIsProcessTrusted()` false in the *already running* process.
+    static func relaunchApp() {
+        let url = Bundle.main.bundleURL
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, error in
+            if let error {
+                NSLog("Triclick: relaunch failed: \(error.localizedDescription)")
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                NSApp.terminate(nil)
+            }
+        }
+    }
 }
