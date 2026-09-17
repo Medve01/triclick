@@ -2,18 +2,23 @@
 
 **Three fingers. Middle click.**
 
-A tiny open-source macOS menu-bar app that turns a three-finger trackpad tap or click into a real middle mouse button — so you can open links in new tabs, close tabs, paste in Terminal, and pan in CAD tools without a mouse.
+A tiny open-source macOS menu-bar app that turns a three-finger trackpad tap or click into a real middle mouse button — open links in new tabs, close tabs, paste in Terminal, pan in CAD — without a mouse.
 
 Trackpad only. No account. No telemetry. MIT licensed.
 
 ## Install
 
-### From a release DMG
+### From a release DMG (recommended)
 
-1. Download `Triclick-x.y.z.dmg` from [Releases](https://github.com/Medve01/triclick/releases).
+1. Download the latest `Triclick-*.dmg` from [Releases](https://github.com/Medve01/triclick/releases).
 2. Open the DMG and drag **Triclick** into **Applications**.
-3. First launch: right-click the app → **Open** (Gatekeeper will warn because builds are ad-hoc signed, not notarized).
-4. Grant **Accessibility** when the welcome window asks — Triclick cannot post clicks without it.
+3. First launch: right-click → **Open** (builds are ad-hoc signed, not notarized — Gatekeeper warns once).
+4. In the welcome window, grant **both**:
+   - **Accessibility** — so Triclick can post a middle click
+   - **Input Monitoring** — so Triclick can see trackpad fingers (required on modern macOS)
+5. Click **Restart Triclick**, then **Continue**.
+
+If a permission toggle looks ON but Triclick still shows ✗: use **Reset Permissions & Restart**, then remove Triclick with **−** and add it again with **+**.
 
 ### Build from source
 
@@ -22,7 +27,7 @@ Requires macOS 13+ and Xcode Command Line Tools (`xcode-select --install`).
 ```bash
 git clone https://github.com/Medve01/triclick.git
 cd triclick
-make install   # builds + copies to /Applications
+make install   # → /Applications/Triclick.app
 # or: make run
 # or: make dmg
 ```
@@ -35,22 +40,25 @@ make install   # builds + copies to /Applications
 | Three-finger **tap** | On | Light tap with three fingers → middle click |
 | **fn + click** | Off | Hold fn and click → middle click |
 
-Toggle everything from the menu-bar icon.
+Toggle everything from the menu-bar **hand.tap** icon. While fingers are on the pad, the icon shows the live finger count (handy for debugging).
 
-## Why Accessibility?
+## Permissions
 
-macOS only lets trusted apps synthesize mouse events. Triclick uses that one permission — no Input Monitoring, no Screen Recording, no kernel extensions.
+| Permission | Why |
+|------------|-----|
+| Accessibility | Post synthetic middle-click events |
+| Input Monitoring | Receive raw MultitouchSupport trackpad frames |
 
-Ad-hoc builds pin Accessibility to each binary hash, so rebuilds break the grant even when the toggle still looks ON. Local builds use a stable **Triclick Local** signing cert (`make cert` once) so permission survives rebuilds.
+No Screen Recording, Full Disk Access, or kernel extensions.
 
-If the toggle is ON but Triclick still shows ✗: click **Reset Permissions & Restart**, then add Triclick again with **+** in Accessibility and Input Monitoring.
+Builds sign with an **identifier-only** designated requirement so these grants survive rebuilds (plain ad-hoc CDHash signing would break them every `make install`).
 
 ## Development
 
 ```bash
-make          # build Triclick.app into build/
+make          # build/Triclick.app
 make run      # build and launch
-make dmg      # build/ + dist/Triclick-1.0.0.dmg
+make dmg      # dist/Triclick-<version>.dmg
 make clean
 ```
 
@@ -58,4 +66,4 @@ make clean
 
 MIT — see [LICENSE](LICENSE).
 
-Inspired by the idea behind [Middle](https://middleclick.app/) and the open-source lineage of MiddleClick / friends. Triclick is an independent project.
+Inspired by the idea behind [Middle](https://middleclick.app/) and the open-source MiddleClick lineage. Triclick is an independent project.
