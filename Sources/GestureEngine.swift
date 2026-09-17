@@ -18,6 +18,7 @@ final class GestureEngine {
     private var fnTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var fnRunLoopSource: CFRunLoopSource?
+    private var liftWatchdog: DispatchWorkItem?
 
     private init() {}
 
@@ -33,6 +34,8 @@ final class GestureEngine {
     }
 
     func stop() {
+        liftWatchdog?.cancel()
+        liftWatchdog = nil
         removeTap(&clickTap, source: &runLoopSource)
         removeTap(&fnTap, source: &fnRunLoopSource)
     }
@@ -40,13 +43,16 @@ final class GestureEngine {
     // MARK: - Multitouch frames
 
     func handleTouches(_ touches: [MTTouch]) {
-        let contacts = touches.filter { TouchState.isContact($0.state) }
+        // States 3–4 = on surface. Exclude 5 (break): counting it kept the chord
+        // "alive" until frames stopped entirely, so we never saw a falling edge.
+        let contacts = touches.filter { TouchState.isOnSurface($0.state) }
         let count = contacts.count
         let centroid = Self.centroid(of: contacts)
 
-        lock.lock()
-        defer { lock.unlock() }
+        var armWatchdog = false
+        var fireTap = false
 
+        lock.lock()
         let previous = contactCount
         contactCount = count
 
@@ -60,30 +66,58 @@ final class GestureEngine {
                 emittedFromClick = false
             } else {
                 maxFingers = max(maxFingers, count)
-                // Only score movement while the full chord is down. Centroid jumps
-                // violently during 3→2→1 peel-off and was rejecting most taps.
                 let dx = centroid.x - startCentroid.x
                 let dy = centroid.y - startCentroid.y
                 maxTravel = max(maxTravel, sqrt(dx * dx + dy * dy))
             }
-            return
-        }
-
-        // Falling edge: had a 3+ chord, now fewer fingers → that's the tap.
-        if gestureActive, previous >= 3, count < 3 {
+            armWatchdog = true
+        } else if gestureActive, previous >= 3 {
+            // Chord just broke (3→2 / 3→0) — this is a tap.
+            fireTap = true
             finishTapGestureLocked()
             resetLocked()
+        } else if gestureActive, count == 0 {
+            resetLocked()
         }
+        lock.unlock()
+
+        // Multitouch often stops delivering frames on lift while still reporting
+        // 3 contacts on the last frame. If we go quiet for ~50ms mid-chord, treat
+        // that as a release so taps still register.
+        DispatchQueue.main.async {
+            self.liftWatchdog?.cancel()
+            self.liftWatchdog = nil
+            guard armWatchdog, !fireTap else { return }
+            let work = DispatchWorkItem { [weak self] in
+                self?.handleSilentLift()
+            }
+            self.liftWatchdog = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
+        }
+    }
+
+    private func handleSilentLift() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard gestureActive, contactCount >= 3 else { return }
+        NSLog("Triclick: silent lift watchdog (was %d fingers)", contactCount)
+        contactCount = 0
+        finishTapGestureLocked()
+        resetLocked()
     }
 
     private func finishTapGestureLocked() {
         guard Preferences.enabled, Preferences.threeFingerTap else { return }
-        guard !emittedFromClick else { return }
-        // Allow a brief 4th contact (palm graze) but require we peaked near 3.
+        guard !emittedFromClick else {
+            NSLog("Triclick: tap skipped — already handled as three-finger click")
+            return
+        }
         guard maxFingers >= 3, maxFingers <= 4 else { return }
         guard shouldEmitInFrontmostApp() else { return }
 
         let elapsedMs = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+        // Ignore hair-trigger noise and long rests / drags.
+        guard elapsedMs >= 25 else { return }
         guard elapsedMs <= Double(Preferences.maxTapTimeMs) else {
             NSLog("Triclick: tap ignored — too slow (%.0f ms)", elapsedMs)
             return

@@ -29,13 +29,13 @@ struct MTTouch {
 }
 
 enum TouchState {
-    // Observed across MiddleClick / Trident / aerospace-swipe on modern macOS:
-    // 1 notTouching, 2 hover?, 3 touching/make, 4 active, 5 break/lift edge
+    // MultitouchSupport lifecycle: 3 = make/touching, 4 = active/on-surface,
+    // 5 = break/lifting. Only 3–4 mean the finger is still down.
     static let touching: UInt32 = 3
     static let active: UInt32 = 4
     static let lifting: UInt32 = 5
 
-    static func isContact(_ state: UInt32) -> Bool {
-        state == touching || state == active || state == lifting
+    static func isOnSurface(_ state: UInt32) -> Bool {
+        state == touching || state == active
     }
 }

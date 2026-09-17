@@ -54,7 +54,7 @@ enum Preferences {
     static var maxTapDistance: Float {
         get {
             let value = defaults.object(forKey: Key.maxTapDistance) as? Float
-            return value ?? 0.15
+            return value ?? 0.20
         }
         set { defaults.set(newValue, forKey: Key.maxTapDistance) }
     }
@@ -62,7 +62,7 @@ enum Preferences {
     static var maxTapTimeMs: Int {
         get {
             let value = defaults.object(forKey: Key.maxTapTimeMs) as? Int
-            return value ?? 750
+            return value ?? 1000
         }
         set { defaults.set(newValue, forKey: Key.maxTapTimeMs) }
     }
