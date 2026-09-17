@@ -41,13 +41,9 @@ Toggle everything from the menu-bar icon.
 
 macOS only lets trusted apps synthesize mouse events. Triclick uses that one permission — no Input Monitoring, no Screen Recording, no kernel extensions.
 
-## Without an Apple Developer account
+Ad-hoc builds pin Accessibility to each binary hash, so rebuilds break the grant even when the toggle still looks ON. Local builds use a stable **Triclick Local** signing cert (`make cert` once) so permission survives rebuilds.
 
-Release DMGs are **ad-hoc signed**. That is intentional for now:
-
-- Fine for you and anyone willing to right-click → **Open** once
-- Not notarized, so Gatekeeper shows a warning
-- When you’re ready for double-click installs for strangers, add a Developer ID + notarization later
+If the toggle is ON but Triclick still shows ✗: click **Reset Permissions & Restart**, then add Triclick again with **+** in Accessibility and Input Monitoring.
 
 ## Development
 

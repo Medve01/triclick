@@ -4,8 +4,9 @@ import IOKit
 import IOKit.hid
 
 enum AccessibilityHelper {
+    /// Fresh TCC check — `AXIsProcessTrusted()` can cache stale false for the process lifetime.
     static var isTrusted: Bool {
-        AXIsProcessTrusted()
+        AXIsProcessTrustedWithOptions(nil)
     }
 
     @discardableResult
@@ -28,7 +29,6 @@ enum AccessibilityHelper {
         ])
     }
 
-    /// macOS 13+ Input Monitoring — required to receive raw MultitouchSupport frames.
     static var hasInputMonitoring: Bool {
         IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
     }
@@ -40,6 +40,35 @@ enum AccessibilityHelper {
 
     static var hasAllPermissions: Bool {
         isTrusted && hasInputMonitoring
+    }
+
+    /// Clears stale TCC rows (ad-hoc CDHash ghosts) then relaunches so a fresh prompt can appear.
+    static func resetTCCAndRelaunch() {
+        let bundleID = Bundle.main.bundleIdentifier ?? "dev.medve01.Triclick"
+        let appURL = Bundle.main.bundleURL
+
+        // Detach: reset AFTER we quit, otherwise tccd can race the still-running process.
+        let script = """
+        #!/bin/zsh
+        sleep 0.6
+        /usr/bin/tccutil reset Accessibility \(bundleID) >/dev/null 2>&1 || true
+        /usr/bin/tccutil reset ListenEvent \(bundleID) >/dev/null 2>&1 || true
+        /usr/bin/open \(appURL.path.shellEscaped)
+        """
+
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("triclick-tcc-reset.sh")
+        do {
+            try script.write(to: tmp, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tmp.path)
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            proc.arguments = [tmp.path]
+            try proc.run()
+        } catch {
+            NSLog("Triclick: failed to schedule TCC reset: \(error.localizedDescription)")
+        }
+
+        NSApp.terminate(nil)
     }
 
     static func relaunchApp() {
@@ -62,5 +91,11 @@ enum AccessibilityHelper {
                 return
             }
         }
+    }
+}
+
+private extension String {
+    var shellEscaped: String {
+        "'" + replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }

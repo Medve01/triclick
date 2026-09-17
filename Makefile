@@ -8,6 +8,7 @@ MACOS_DIR    := $(CONTENTS)/MacOS
 RES_DIR      := $(CONTENTS)/Resources
 DIST_DIR     := dist
 DMG_NAME     := $(APP_NAME)-$(VERSION).dmg
+CERT_NAME    := Triclick Local
 
 SWIFTC       := swiftc
 SDK          := $(shell xcrun --show-sdk-path)
@@ -24,9 +25,21 @@ FRAMEWORKS   := -framework AppKit \
                 -F /System/Library/PrivateFrameworks \
                 -framework MultitouchSupport
 
-.PHONY: all app run dmg clean install
+# Prefer a stable self-signed identity when present; otherwise ad-hoc with an
+# identifier-only designated requirement so TCC grants survive rebuilds
+# (plain `codesign -s -` pins TCC to the per-build CDHash — broken every make).
+SIGN_IDENTITY := $(shell security find-identity -v -p codesigning 2>/dev/null | grep -F '$(CERT_NAME)' | head -1 | sed -E 's/.*"($(CERT_NAME))".*/\1/')
+ifeq ($(strip $(SIGN_IDENTITY)),)
+SIGN_IDENTITY := -
+endif
+REQS := =designated => identifier "$(BUNDLE_ID)"
+
+.PHONY: all app run dmg clean install cert
 
 all: app
+
+cert:
+	@zsh Scripts/create-dev-cert.sh
 
 app: $(APP_DIR)/Contents/MacOS/$(APP_NAME)
 
@@ -35,8 +48,9 @@ $(APP_DIR)/Contents/MacOS/$(APP_NAME): $(SWIFT_FILES) Resources/Info.plist
 	@echo "→ Compiling $(APP_NAME)…"
 	$(SWIFTC) $(SWIFT_FILES) -o "$(MACOS_DIR)/$(APP_NAME)" $(CFLAGS) $(FRAMEWORKS)
 	@cp Resources/Info.plist "$(CONTENTS)/Info.plist"
-	@# Ad-hoc sign so Gatekeeper treats it as a local build (no Developer ID needed).
-	@codesign --force --deep --sign - "$(APP_DIR)"
+	@echo "→ Signing with: $(SIGN_IDENTITY) (stable TCC identity)"
+	@codesign --force --deep --sign "$(SIGN_IDENTITY)" --identifier "$(BUNDLE_ID)" --requirements '$(REQS)' "$(APP_DIR)"
+	@codesign -d -r- "$(APP_DIR)" 2>&1 | head -3
 	@echo "✓ Built $(APP_DIR)"
 
 run: app
@@ -46,8 +60,8 @@ install: app
 	@echo "→ Installing to /Applications/$(APP_NAME).app"
 	@rm -rf "/Applications/$(APP_NAME).app"
 	@cp -R "$(APP_DIR)" "/Applications/$(APP_NAME).app"
-	@codesign --force --deep --sign - "/Applications/$(APP_NAME).app"
-	@echo "✓ Installed. Launch from Applications, then grant Accessibility."
+	@codesign --force --deep --sign "$(SIGN_IDENTITY)" --identifier "$(BUNDLE_ID)" --requirements '$(REQS)' "/Applications/$(APP_NAME).app"
+	@echo "✓ Installed. Grant Accessibility + Input Monitoring once (survives rebuilds)."
 
 dmg: app
 	@mkdir -p "$(DIST_DIR)"

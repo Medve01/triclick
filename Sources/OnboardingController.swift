@@ -27,8 +27,8 @@ final class OnboardingController: NSObject {
     }
 
     private func makeWindow() -> NSWindow {
-        let width: CGFloat = 480
-        let height: CGFloat = 440
+        let width: CGFloat = 500
+        let height: CGFloat = 500
         let rect = NSRect(x: 0, y: 0, width: width, height: height)
         let window = NSWindow(
             contentRect: rect,
@@ -48,10 +48,9 @@ final class OnboardingController: NSObject {
         title.translatesAutoresizingMaskIntoConstraints = false
 
         let body = NSTextField(wrappingLabelWithString:
-            "Triclick needs two permissions (macOS only applies them after a restart):\n\n" +
-            "1. Accessibility — so it can post a middle click\n" +
-            "2. Input Monitoring — so it can see trackpad fingers\n\n" +
-            "Turn both ON for Triclick, then click Restart."
+            "Triclick needs Accessibility and Input Monitoring.\n\n" +
+            "If a toggle looks ON but Triclick still says ✗, macOS is stuck on an old grant. " +
+            "Use Reset Permissions below — that clears it — then add Triclick again with the + button."
         )
         body.font = .systemFont(ofSize: 13)
         body.alignment = .left
@@ -71,6 +70,10 @@ final class OnboardingController: NSObject {
         imButton.bezelStyle = .rounded
         imButton.translatesAutoresizingMaskIntoConstraints = false
 
+        let resetButton = NSButton(title: "Reset Permissions & Restart", target: self, action: #selector(resetPermissions))
+        resetButton.bezelStyle = .rounded
+        resetButton.translatesAutoresizingMaskIntoConstraints = false
+
         let restartButton = NSButton(title: "Restart Triclick", target: self, action: #selector(restart))
         restartButton.bezelStyle = .rounded
         restartButton.translatesAutoresizingMaskIntoConstraints = false
@@ -87,35 +90,39 @@ final class OnboardingController: NSObject {
         content.addSubview(status)
         content.addSubview(axButton)
         content.addSubview(imButton)
+        content.addSubview(resetButton)
         content.addSubview(restartButton)
         content.addSubview(continueButton)
         window.contentView = content
 
         NSLayoutConstraint.activate([
-            title.topAnchor.constraint(equalTo: content.topAnchor, constant: 24),
+            title.topAnchor.constraint(equalTo: content.topAnchor, constant: 22),
             title.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 28),
             title.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -28),
 
-            body.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 14),
+            body.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 12),
             body.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 28),
             body.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -28),
 
-            status.topAnchor.constraint(equalTo: body.bottomAnchor, constant: 16),
+            status.topAnchor.constraint(equalTo: body.bottomAnchor, constant: 14),
             status.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 28),
             status.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -28),
 
-            axButton.topAnchor.constraint(equalTo: status.bottomAnchor, constant: 16),
+            axButton.topAnchor.constraint(equalTo: status.bottomAnchor, constant: 14),
             axButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
 
             imButton.topAnchor.constraint(equalTo: axButton.bottomAnchor, constant: 8),
             imButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
 
-            restartButton.topAnchor.constraint(equalTo: imButton.bottomAnchor, constant: 12),
+            resetButton.topAnchor.constraint(equalTo: imButton.bottomAnchor, constant: 12),
+            resetButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+
+            restartButton.topAnchor.constraint(equalTo: resetButton.bottomAnchor, constant: 8),
             restartButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
 
             continueButton.topAnchor.constraint(equalTo: restartButton.bottomAnchor, constant: 8),
             continueButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
-            continueButton.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -20)
+            continueButton.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18)
         ])
 
         return window
@@ -159,6 +166,11 @@ final class OnboardingController: NSObject {
     @objc private func openInputMonitoring() {
         _ = AccessibilityHelper.requestInputMonitoring()
         AccessibilityHelper.openInputMonitoringSettings()
+    }
+
+    @objc private func resetPermissions() {
+        pollTimer?.invalidate()
+        AccessibilityHelper.resetTCCAndRelaunch()
     }
 
     @objc private func restart() {
