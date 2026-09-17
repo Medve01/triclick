@@ -1,6 +1,6 @@
 APP_NAME     := Triclick
 BUNDLE_ID    := dev.medve01.Triclick
-VERSION      := 1.0.0
+VERSION      := 1.0.1
 BUILD_DIR    := build
 APP_DIR      := $(BUILD_DIR)/$(APP_NAME).app
 CONTENTS     := $(APP_DIR)/Contents
