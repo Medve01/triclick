@@ -14,18 +14,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar = MenuBarController(appDelegate: self)
         OnboardingController.shared.showIfNeeded()
 
-        if AccessibilityHelper.isTrusted {
+        if AccessibilityHelper.hasAllPermissions {
             startEngineIfNeeded()
         } else {
-            // Keep watching — user may grant permission without finishing onboarding.
             accessibilityTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-                guard AccessibilityHelper.isTrusted else { return }
+                guard AccessibilityHelper.hasAllPermissions else { return }
                 self?.startEngineIfNeeded()
                 self?.menuBar?.reload()
             }
         }
 
-        // Heal menu state when the user returns from System Settings.
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
@@ -41,9 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func startEngineIfNeeded() {
-        guard AccessibilityHelper.isTrusted else { return }
+        guard AccessibilityHelper.hasAllPermissions else { return }
         guard !engineStarted else {
-            // Re-install taps in case macOS disabled them.
             GestureEngine.shared.start()
             return
         }
@@ -51,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         GestureEngine.shared.start()
         DeviceMonitor.shared.start()
         menuBar?.reload()
+        menuBar?.startFingerHUD()
         accessibilityTimer?.invalidate()
         accessibilityTimer = nil
         NSLog("Triclick: engine started")

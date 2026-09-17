@@ -1,3 +1,4 @@
+/// Binary layout matching MultitouchSupport's per-touch record.
 struct MTPoint {
     var x: Float
     var y: Float
@@ -8,7 +9,6 @@ struct MTVector {
     var velocity: MTPoint
 }
 
-/// Binary layout matching MultitouchSupport's per-touch record.
 struct MTTouch {
     var frame: Int32
     var timestamp: Double
@@ -29,10 +29,13 @@ struct MTTouch {
 }
 
 enum TouchState {
+    // Observed across MiddleClick / Trident / aerospace-swipe on modern macOS:
+    // 1 notTouching, 2 hover?, 3 touching/make, 4 active, 5 break/lift edge
     static let touching: UInt32 = 3
     static let active: UInt32 = 4
+    static let lifting: UInt32 = 5
 
     static func isContact(_ state: UInt32) -> Bool {
-        state == touching || state == active
+        state == touching || state == active || state == lifting
     }
 }

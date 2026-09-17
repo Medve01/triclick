@@ -3,6 +3,7 @@ import AppKit
 final class MenuBarController: NSObject {
     private let statusItem: NSStatusItem
     private weak var appDelegate: AppDelegate?
+    private var hudTimer: Timer?
 
     init(appDelegate: AppDelegate) {
         self.appDelegate = appDelegate
@@ -10,15 +11,13 @@ final class MenuBarController: NSObject {
         super.init()
 
         if let button = statusItem.button {
-            // Prefer a system symbol so the item is obvious in the menu bar;
-            // fall back to our drawn glyph on older macOS.
             if let symbol = NSImage(systemSymbolName: "hand.tap", accessibilityDescription: "Triclick") {
                 symbol.isTemplate = true
                 button.image = symbol
             } else {
                 button.image = Self.menuIcon()
             }
-            button.imagePosition = .imageOnly
+            button.imagePosition = .imageLeading
             button.toolTip = "Triclick"
         }
 
@@ -29,13 +28,32 @@ final class MenuBarController: NSObject {
         statusItem.menu = buildMenu()
     }
 
+    /// Show live finger count next to the icon so you can verify the trackpad is seen.
+    func startFingerHUD() {
+        hudTimer?.invalidate()
+        hudTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+            guard let self, let button = self.statusItem.button else { return }
+            let n = GestureEngine.shared.currentContactCount
+            button.title = n > 0 ? "\(n)" : ""
+        }
+    }
+
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
 
-        if !AccessibilityHelper.isTrusted {
-            let warn = NSMenuItem(title: "Needs Accessibility Permission…", action: #selector(showOnboarding), keyEquivalent: "")
+        if !AccessibilityHelper.hasAllPermissions {
+            let warn = NSMenuItem(title: "Needs Permissions…", action: #selector(showOnboarding), keyEquivalent: "")
             warn.target = self
             menu.addItem(warn)
+            menu.addItem(.separator())
+        } else {
+            let ok = NSMenuItem(
+                title: "Fingers now: \(GestureEngine.shared.currentContactCount)",
+                action: nil,
+                keyEquivalent: ""
+            )
+            ok.isEnabled = false
+            menu.addItem(ok)
             menu.addItem(.separator())
         }
 

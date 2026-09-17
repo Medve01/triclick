@@ -11,7 +11,7 @@ final class OnboardingController: NSObject {
     }
 
     func showIfNeeded() {
-        guard !Preferences.onboardingDone || !AccessibilityHelper.isTrusted else { return }
+        guard !Preferences.onboardingDone || !AccessibilityHelper.hasAllPermissions else { return }
         show()
     }
 
@@ -27,8 +27,8 @@ final class OnboardingController: NSObject {
     }
 
     private func makeWindow() -> NSWindow {
-        let width: CGFloat = 460
-        let height: CGFloat = 400
+        let width: CGFloat = 480
+        let height: CGFloat = 440
         let rect = NSRect(x: 0, y: 0, width: width, height: height)
         let window = NSWindow(
             contentRect: rect,
@@ -48,111 +48,117 @@ final class OnboardingController: NSObject {
         title.translatesAutoresizingMaskIntoConstraints = false
 
         let body = NSTextField(wrappingLabelWithString:
-            "Triclick adds the missing middle mouse button to your Mac trackpad.\n\n" +
-            "1. Click Open Accessibility Settings\n" +
-            "2. Turn Triclick ON (toggle off/on if it was already on)\n" +
-            "3. Click Restart Triclick — macOS only applies the permission after a relaunch"
+            "Triclick needs two permissions (macOS only applies them after a restart):\n\n" +
+            "1. Accessibility — so it can post a middle click\n" +
+            "2. Input Monitoring — so it can see trackpad fingers\n\n" +
+            "Turn both ON for Triclick, then click Restart."
         )
         body.font = .systemFont(ofSize: 13)
         body.alignment = .left
         body.translatesAutoresizingMaskIntoConstraints = false
 
-        let status = NSTextField(labelWithString: statusText())
+        let status = NSTextField(wrappingLabelWithString: statusText())
         status.tag = 100
         status.font = .systemFont(ofSize: 13, weight: .medium)
         status.alignment = .center
         status.translatesAutoresizingMaskIntoConstraints = false
 
-        let grantButton = NSButton(title: "Open Accessibility Settings", target: self, action: #selector(openSettings))
-        grantButton.bezelStyle = .rounded
-        grantButton.translatesAutoresizingMaskIntoConstraints = false
-        grantButton.tag = 102
+        let axButton = NSButton(title: "Open Accessibility", target: self, action: #selector(openAccessibility))
+        axButton.bezelStyle = .rounded
+        axButton.translatesAutoresizingMaskIntoConstraints = false
+
+        let imButton = NSButton(title: "Open Input Monitoring", target: self, action: #selector(openInputMonitoring))
+        imButton.bezelStyle = .rounded
+        imButton.translatesAutoresizingMaskIntoConstraints = false
 
         let restartButton = NSButton(title: "Restart Triclick", target: self, action: #selector(restart))
         restartButton.bezelStyle = .rounded
         restartButton.translatesAutoresizingMaskIntoConstraints = false
         restartButton.keyEquivalent = "\r"
-        restartButton.tag = 103
 
         let continueButton = NSButton(title: "Continue", target: self, action: #selector(finish))
         continueButton.bezelStyle = .rounded
         continueButton.translatesAutoresizingMaskIntoConstraints = false
-        continueButton.isEnabled = AccessibilityHelper.isTrusted
+        continueButton.isEnabled = AccessibilityHelper.hasAllPermissions
         continueButton.tag = 101
 
         content.addSubview(title)
         content.addSubview(body)
         content.addSubview(status)
-        content.addSubview(grantButton)
+        content.addSubview(axButton)
+        content.addSubview(imButton)
         content.addSubview(restartButton)
         content.addSubview(continueButton)
         window.contentView = content
 
         NSLayoutConstraint.activate([
-            title.topAnchor.constraint(equalTo: content.topAnchor, constant: 28),
+            title.topAnchor.constraint(equalTo: content.topAnchor, constant: 24),
             title.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 28),
             title.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -28),
 
-            body.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 16),
+            body.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 14),
             body.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 28),
             body.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -28),
 
-            status.topAnchor.constraint(equalTo: body.bottomAnchor, constant: 18),
+            status.topAnchor.constraint(equalTo: body.bottomAnchor, constant: 16),
             status.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 28),
             status.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -28),
 
-            grantButton.topAnchor.constraint(equalTo: status.bottomAnchor, constant: 18),
-            grantButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+            axButton.topAnchor.constraint(equalTo: status.bottomAnchor, constant: 16),
+            axButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
 
-            restartButton.topAnchor.constraint(equalTo: grantButton.bottomAnchor, constant: 10),
+            imButton.topAnchor.constraint(equalTo: axButton.bottomAnchor, constant: 8),
+            imButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+
+            restartButton.topAnchor.constraint(equalTo: imButton.bottomAnchor, constant: 12),
             restartButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
 
-            continueButton.topAnchor.constraint(equalTo: restartButton.bottomAnchor, constant: 10),
+            continueButton.topAnchor.constraint(equalTo: restartButton.bottomAnchor, constant: 8),
             continueButton.centerXAnchor.constraint(equalTo: content.centerXAnchor),
-            continueButton.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -24)
+            continueButton.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -20)
         ])
 
         return window
     }
 
     private func statusText() -> String {
-        if AccessibilityHelper.isTrusted {
-            return "✓ Accessibility is granted — you can Continue"
-        }
-        return "Permission applies after Restart (even if the toggle is already ON)"
+        let ax = AccessibilityHelper.isTrusted ? "✓" : "✗"
+        let im = AccessibilityHelper.hasInputMonitoring ? "✓" : "✗"
+        return "Accessibility \(ax)   Input Monitoring \(im)"
     }
 
     private func startPolling() {
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
             self?.refreshStatus()
         }
     }
 
     private func refreshStatus() {
         guard let content = window?.contentView else { return }
-        let trusted = AccessibilityHelper.isTrusted
+        let ready = AccessibilityHelper.hasAllPermissions
 
         if let status = content.viewWithTag(100) as? NSTextField {
             status.stringValue = statusText()
-            status.textColor = trusted ? .systemGreen : .secondaryLabelColor
+            status.textColor = ready ? .systemGreen : .secondaryLabelColor
         }
         if let button = content.viewWithTag(101) as? NSButton {
-            button.isEnabled = trusted
-        }
-        // Hide Restart once trusted; show Continue as the path forward.
-        if let restart = content.viewWithTag(103) as? NSButton {
-            restart.isHidden = trusted
+            button.isEnabled = ready
         }
 
-        if trusted {
+        if ready {
             AppDelegate.shared?.startEngineIfNeeded()
         }
     }
 
-    @objc private func openSettings() {
+    @objc private func openAccessibility() {
         AccessibilityHelper.requestTrust(prompt: true)
-        AccessibilityHelper.openSystemSettings()
+        AccessibilityHelper.openAccessibilitySettings()
+    }
+
+    @objc private func openInputMonitoring() {
+        _ = AccessibilityHelper.requestInputMonitoring()
+        AccessibilityHelper.openInputMonitoringSettings()
     }
 
     @objc private func restart() {
@@ -161,7 +167,7 @@ final class OnboardingController: NSObject {
     }
 
     @objc private func finish() {
-        guard AccessibilityHelper.isTrusted else { return }
+        guard AccessibilityHelper.hasAllPermissions else { return }
         Preferences.onboardingDone = true
         if Preferences.launchAtLogin {
             LoginItem.syncFromPreferences()

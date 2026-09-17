@@ -14,6 +14,13 @@ final class DeviceMonitor {
     func start() {
         guard !started else { return }
         started = true
+
+        // Ask early — without Input Monitoring, macOS 26 delivers zero frames.
+        if !AccessibilityHelper.hasInputMonitoring {
+            AccessibilityHelper.requestInputMonitoring()
+            NSLog("Triclick: Input Monitoring not granted — trackpad frames will be empty")
+        }
+
         registerDevices()
 
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -46,12 +53,23 @@ final class DeviceMonitor {
     }
 
     private func registerDevices() {
-        // Prefer the default (built-in) trackpad. Iterating MTDeviceCreateList and
-        // calling family APIs on raw CFArray pointers is crash-prone across OS versions.
         var found: [MTDeviceRef] = []
 
-        if let device = MTDeviceCreateDefault() {
-            found.append(device)
+        if let list = MTDeviceCreateList()?.takeRetainedValue() {
+            let count = CFArrayGetCount(list)
+            for i in 0..<count {
+                guard let raw = CFArrayGetValueAtIndex(list, i) else { continue }
+                let device = UnsafeMutableRawPointer(mutating: raw)
+                // Keep an extra retain so the framework can't tear the handle down
+                // out from under us on sleep/wake (see Trident / MiddleClick lineage).
+                _ = Unmanaged<AnyObject>.fromOpaque(device).retain()
+                found.append(device)
+            }
+        }
+
+        if found.isEmpty, let fallback = MTDeviceCreateDefault() {
+            _ = Unmanaged<AnyObject>.fromOpaque(fallback).retain()
+            found.append(fallback)
         }
 
         for device in found {
@@ -60,11 +78,7 @@ final class DeviceMonitor {
         }
         devices = found
 
-        if found.isEmpty {
-            NSLog("Triclick: no trackpad multitouch device found")
-        } else {
-            NSLog("Triclick: listening on built-in trackpad")
-        }
+        NSLog("Triclick: listening on \(found.count) multitouch device(s); inputMonitoring=\(AccessibilityHelper.hasInputMonitoring)")
     }
 }
 

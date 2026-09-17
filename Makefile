@@ -20,6 +20,7 @@ FRAMEWORKS   := -framework AppKit \
                 -framework Foundation \
                 -framework ApplicationServices \
                 -framework ServiceManagement \
+                -framework IOKit \
                 -F /System/Library/PrivateFrameworks \
                 -framework MultitouchSupport
 

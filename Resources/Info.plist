@@ -29,6 +29,8 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Medve01. MIT License.</string>
 	<key>NSAccessibilityUsageDescription</key>
-	<string>Triclick needs Accessibility access to turn a three-finger trackpad tap or click into a middle click.</string>
+	<string>Triclick needs Accessibility access to post a middle click.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Triclick uses system events to emulate a middle mouse button.</string>
 </dict>
 </plist>
