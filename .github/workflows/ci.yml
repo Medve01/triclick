@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app
+        run: make app
+      - name: Package DMG
+        run: make dmg
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Triclick-dmg
+          path: dist/*

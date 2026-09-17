@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Keep Makefile VERSION in sync with the tag for this run.
+          sed -i '' "s/^VERSION.*/VERSION      := ${VERSION}/" Makefile
+          make dmg
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.dmg
+            dist/*.sha256
+          generate_release_notes: true
