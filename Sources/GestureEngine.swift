@@ -47,6 +47,7 @@ final class GestureEngine {
         lock.lock()
         defer { lock.unlock() }
 
+        let previous = contactCount
         contactCount = count
 
         if count >= 3 {
@@ -59,6 +60,8 @@ final class GestureEngine {
                 emittedFromClick = false
             } else {
                 maxFingers = max(maxFingers, count)
+                // Only score movement while the full chord is down. Centroid jumps
+                // violently during 3→2→1 peel-off and was rejecting most taps.
                 let dx = centroid.x - startCentroid.x
                 let dy = centroid.y - startCentroid.y
                 maxTravel = max(maxTravel, sqrt(dx * dx + dy * dy))
@@ -66,25 +69,18 @@ final class GestureEngine {
             return
         }
 
-        // Fingers lift one-by-one (3→2→1→0). Keep the gesture alive until the
-        // pad is clear — cancelling on the way down ate every three-finger tap.
-        if gestureActive {
-            if count > 0, !contacts.isEmpty {
-                let dx = centroid.x - startCentroid.x
-                let dy = centroid.y - startCentroid.y
-                maxTravel = max(maxTravel, sqrt(dx * dx + dy * dy))
-            }
-            if count == 0 {
-                finishTapGestureLocked()
-                resetLocked()
-            }
+        // Falling edge: had a 3+ chord, now fewer fingers → that's the tap.
+        if gestureActive, previous >= 3, count < 3 {
+            finishTapGestureLocked()
+            resetLocked()
         }
     }
 
     private func finishTapGestureLocked() {
         guard Preferences.enabled, Preferences.threeFingerTap else { return }
         guard !emittedFromClick else { return }
-        guard maxFingers == 3 else { return }
+        // Allow a brief 4th contact (palm graze) but require we peaked near 3.
+        guard maxFingers >= 3, maxFingers <= 4 else { return }
         guard shouldEmitInFrontmostApp() else { return }
 
         let elapsedMs = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
@@ -97,7 +93,7 @@ final class GestureEngine {
             return
         }
 
-        NSLog("Triclick: three-finger tap → middle click")
+        NSLog("Triclick: three-finger tap → middle click (fingers=%d travel=%.3f %.0fms)", maxFingers, maxTravel, elapsedMs)
         DispatchQueue.main.async {
             MiddleClickSynthesizer.postClick()
         }

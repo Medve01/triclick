@@ -50,11 +50,11 @@ enum Preferences {
         set { defaults.set(Array(newValue).sorted(), forKey: Key.ignoredApps) }
     }
 
-    /// Normalized trackpad units (0–1). Default ~5% of the pad.
+    /// Normalized trackpad units (0–1). Measured only while 3 fingers are down.
     static var maxTapDistance: Float {
         get {
             let value = defaults.object(forKey: Key.maxTapDistance) as? Float
-            return value ?? 0.05
+            return value ?? 0.15
         }
         set { defaults.set(newValue, forKey: Key.maxTapDistance) }
     }
@@ -62,7 +62,7 @@ enum Preferences {
     static var maxTapTimeMs: Int {
         get {
             let value = defaults.object(forKey: Key.maxTapTimeMs) as? Int
-            return value ?? 500
+            return value ?? 750
         }
         set { defaults.set(newValue, forKey: Key.maxTapTimeMs) }
     }
